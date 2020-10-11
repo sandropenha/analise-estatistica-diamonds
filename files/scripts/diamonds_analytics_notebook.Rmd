@@ -1,0 +1,394 @@
+---
+title: "Análise Estatística - Diamonds"
+author: "sandropenha"
+date: "05/09/2020"
+output: html_document
+
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, include = FALSE)
+```
+
+#### **Sobre:**
+
+Análise estatística  do dataset **"diamonds"** disponibilizado pela biblioteca do **ggplot2**, uma das mais importantes bibliotecas para visualização de dados quando falamos em data science. 
+
+Dentre os objetivos deste projeto, estão a prática de técnicas de análise exploratória e modelagem estatística para obtenção de insights em relação aos dados.
+
+O dataset possui variáveis categóricas e numéricas que explicam o preço de um diamante. 
+
+Serão aplicadas aqui as mais variadas técnicas de visualização e compreensão dos dados.
+
+
+#### **Pré-visualização dos dados:**
+```{r}
+pacman::p_load(tidyverse,knitr,qcc,corrplot,lvplot,e1071,caret)
+```
+````{r}
+df <- diamonds %>% 
+  select_all() %>% 
+  transmute(peso = carat,
+            qualidade = cut,
+            cor = color,
+            claridade = clarity,
+            comprimento = x,
+            largura = y,
+            profundidade = depth,
+            tabela = table,
+            preco = price);kable(head(df))
+```
+
+#### **Dicionário de dados:**
+
+Originalmente, o dataset está todo em inglês, mas para facilitar a compreensão dos dados, foi realizada a tradução das variáveis para **pt-br** que seguem-se:
+
+- **peso:** peso do diamante
+- **qualidade:** qualidade do corte (fair,good,very good,premium,ideal)
+- **cor:** cor do diamante, de D (best) a J (worst)
+- **claridade:** medidade quao claro o diamante é, (I1 (worst), SI2, SI1, VS2, VS1, VVS2, VVS1, IF (best))
+- **comprimento:** comprimento em mm (0–10.74)
+- **largura:** largura em mm (0–58.9)
+- **profundidade:** profundidade em mm (0–31.8)
+- **tabela:** largura do topo do diamante relativo ao ponto mais largo (43–95)
+- **preco:** preço em dolares  (\$326–\$18,823)
+
+#### **Número de diamantes por qualidade:**
+
+```{r}
+p1 <- ggplot(df,aes(x = qualidade),fill = "steelblue")+
+  geom_bar(aes(stat = "identity"))+
+  theme_minimal()+
+  labs(title = "Número de diamantes por qualidade", x = "Qualidade",y="");p1
+```
+
+**40%** dos diamantes presentes no dataset sao classificados como o tipo **"Ideal"**. Em valores absolutos, isso nos diz que há mais de 20.000 registros para esse tipo de diamantes presentes no dataset. 
+
+
+``` {r, warnings = FALSE} 
+p2 <- ggplot(df, aes(x = peso))+
+  geom_histogram(bins = 30, fill = "steelblue", color = "white" ,alpha = 0.8)+
+  theme_minimal()+
+  labs(title = "Número de diamantes por faixa de peso", x = "Kilogramas", y="");p2
+```
+
+Grande parte dos diamantes possuem entre aproximadamente 0,25 e 1 kilogramas.
+
+
+
+```{r, warnings = F, message=FALSE}
+options(warnings = -1)
+p3 <- ggplot(df,aes(x = peso,color=qualidade))+
+  geom_freqpoly(bins = 30,size = 2)+
+  theme_minimal()+
+  labs(title = "Número de diamantes por faixa de peso e qualidade", x = "Kilogramas",y="");p3
+
+```
+
+
+É possível ver aqui a relação do tipo de diamantes por qualidade e sua distribuição de contagem por Kilogramas.
+
+Em sua grande maioria, diamantes do tipo **"Ideal"**, estão mais concentrados na faixa de aproximadamente 0,25 kilogramas.
+
+
+
+```{r}
+p4 <- ggplot(df,aes(x = qualidade, y = peso, fill = qualidade))+
+  geom_boxplot(color = "grey")+
+  theme_minimal()+
+  labs(title="Boxplot por qualidade dos diamantes", x = "Qualidade",y="Kilogramas",
+       subtitle = "Análise de Kilogramas");p4
+```
+
+Há alguns insights interessantes que podemos tirar analisando o box-plot por peso e qualidade dos diamantes:
+
+Diamantes do tipo **"Fair"** posssuem intervalo interquatilico **menor** que os demais tipos de diamantes, sendo o diamante do tipo **"Premium"**, o que possui **maior** intervalo interquatilico do conjunto de dados. 
+
+Essa medida é importante pois aqui conseguimos avaliar a variabilidade dos dados sem sofrer influência da presença de outliers (valores muito distantes da média).
+
+Podemos medir a variabilidade também através da amplitude (valor máximo - valor minimo), a diferença é que aqui estamos considerando valores outliers. 
+
+Por essa visão, **"Fair"** é o tipo que mais apresenta variabilidade em sua distribuição de dados. É importante notar também a concentração de outliers na faixa acima de 4 Kilogramas para esse tipo de diamante, sendo o único a apresentar essa característica.
+
+Também podemos notar que em todos os casos, temos a **média maior que a mediana**, pois o "bigode" possui inclinação para a parte superior, ou seja ambas as amostras podem ser ditas como assimétricas. 
+
+Tal observação é confirmada calculando o coeficiente de Assimetria (skewness).
+
+#### **Considerações para o cálculo o coeficiente de Assimetria:**
+
+Se  menor que **-1 ou maior que 1**, a distribuição é **altamente distorcida**.
+
+Se  entre **-1 e -0,5 ou entre 0,5 e 1**, a distribuição é **enviesada moderadamente**.
+
+Se  entre **-0,5 e 0,5**, a distribuição é **aproximadamente simétrica**.
+
+```{r}
+premium <- df %>% filter(qualidade == "Premium")
+ideal <- df %>% filter(qualidade == "Ideal")
+verygood <- df %>% filter(qualidade == "Very Good")
+good <- df %>% filter(qualidade == "Good")
+fair <- df %>% filter(qualidade == "Fair")
+```
+
+```{r, echo = FALSE, include = F}
+skewness(premium$peso) # 0.8615343
+skewness(ideal$peso) # 1.339344
+skewness(verygood$peso) # 0.9936572
+skewness(good$peso) # 1.028119
+skewness(fair$peso) # 1.683545
+```
+
+**Coeficiente de Assimetria, avaliação de kilogramas dos diamantes:**
+
+- **Premium:** 0.8615343
+- **Ideal:**  1.339344
+- **Very Good:** 0.9936572
+- **Good:** 1.028119
+- **Fair:** 1.683545
+
+Pode-se concluir que as amostras são de fato assimétricas, pois para possuir simetria os coeficientes deveriam ficar entre **-0,5** e **0,5**, isso significa dizer que, temos um indicio comum de que as amostras não tratam-se de distribuições normais.
+
+
+```{r}
+p5 <- ggplot(df,aes(x = qualidade, y = preco, fill = qualidade))+
+  geom_boxplot(color = "grey")+
+  theme_minimal()+
+  labs(title="Boxplot por qualidade dos diamantes", subtitles= "Analise de preços", x = "Qualidade",y="Preço");p5
+```
+
+Um insight interessante que podemos tirar dessa análise é que, diamantes do tipo **"Ideal"**, que é a melhor qualidade de diamantes, tem uma mediana de preço menor que os demais tipos de diamantes. Ou seja, a primeira vista, diamantes de qualidade inferior custam mais caro.
+
+Para essas distribuições, também temos dados assimétricos.
+
+Quando falamos em intervalo interquatilico, ou seja, a variabilidade dos dados desconsiderando os valores outliers, diamantes do tipo 'Fair', possuem menor variabilidade.
+
+**Realizando teste de hipótese: Diamantes de qualidade inferior são realmente mais caros?**
+
+Através do teste-T de student será verificada a hipótese de se de fato diamantes do tipo "**Fair**" custam mais caro que diamantes de qualidade superior:
+
+ Uma das premissas para a aplicação desse teste é a existência de uma distribuição normal dos dados. Contudo, existem 3 tipos de teste T:
+ 
+- Teste T de amostras independentes
+ 
+- Teste T de amostras relacionadas (pareados)
+
+- Teste T de amostras normalmente distribuídas.
+
+Para verificar se as amostras são normalmente distribuídas, realizaremos o shapiro Test antes nas seguintes condições:
+
+- **h0:** Dados normalmente distribuíos
+- **h1:** Dados não normalmente distribuídos
+
+- se p-value **maior que 0.05 não rejeitamos** a hipotese nula e podemos assumir a normalidade dos dados.
+- se p-value for **menor que 0.5, rejeitamos** a hipotese nula e não podemos assumir a normalidade dos dados.
+
+```{r}
+df_fair <- df %>% filter(qualidade == "Fair") %>% sample_frac(0.5)
+df_ideal <- df %>% filter(qualidade == "Ideal") %>% sample_frac(0.2)
+```
+
+```{r, echo = FALSE}
+shapiro.test(df_fair$preco)
+shapiro.test(df_ideal$preco)
+```
+
+Como o p-value de ambas as amostras estão abaixo de 0.5 rejeitamos a hipótese nula e **NÃO** podemos assumir a normalidade dos dados.
+
+#### **Verificando se as amostras são independentes:**
+
+```{r}
+df_fair2 <- df_fair %>% select(preco) %>% sample_n(800);colnames(df_fair2) <- c("fair")
+df_ideal2 <- df_ideal %>% select(preco) %>% sample_n(800);colnames(df_ideal2) <- c("ideal")
+df_corr <- cbind(df_fair2,df_ideal2)
+```
+
+**Coeficiente de correlação de pearson:**
+```{r, echo = FALSE, include=FALSE}
+cor(df_corr$fair,df_corr$ideal)
+```
+```{r}
+ggplot(df_corr,aes(x=fair,y=ideal))+
+  geom_point(color = "steelblue", alpha = 0.8)+
+  labs(title = "Correlação Fair x Ideal",
+       subtitle = cor(df_corr$fair,df_corr$ideal))+
+  theme_minimal()
+```
+
+Visualizando tanto o coeficiente de correlação quanto o gráfico de dispersão, podemos concluir que de fato **não há correlação** alguma entre nossas amostras e então, podemos seguir com o teste de hipótese.
+
+
+Vamos realizar um teste de hipótese bicaudal, ou seja, testaremos a hipótese de que o preço dos diamantes do tipo  **"Fair"** e dos diamantes do tipo **"Ideal"** não apresentam diferenças significativas.
+
+
+
+```{r, echo = FALSE}
+teste <- t.test(df_corr$fair, df_corr$ideal,paired = F, conf.level = 0.95, alternative = "t");teste
+```
+
+De acordo com o teste-t realizado, rejeitamos a hipotese nula, pois o valor p é muito baixo.
+
+há diferenças significativas entre os preços dos dois tipos de diamantes e a análise de média nos diz que de fato, diamantes do tipo **"Fair"** são **mais caros** que os do tipo **"Ideal"**.
+
+
+ 
+```{r}
+p6 <- ggplot(df)+
+  geom_histogram(aes(x = largura), binwidth = 0.5, fill = "steelblue", color = "white")+
+  coord_cartesian(ylim = c(0,50))+
+  ggtitle("Análise de largura dos diamantes",subtitle= "Identificando outliers com coordenadas cartesianas")+
+  theme_minimal();p6
+```
+
+Há valores outliers na faixa intermediária de 30 e na faixa superior de 50 e também há valores na faixa de 0.
+
+
+#### **Verificando valores outliers com correlação comprimento x largura:**
+
+Uma outra forma de identificar valores outliers é correlacionar uma variável independente a uma variável dependente.
+
+Isso também é muito útil para entendermos como se relacionam as variáveis do dataset. no caso, vamos correlacionar o comprimento com a largura, pois levando-se em consideração de que estamos falando de diamantes, o normal é que a medida que seu comprimento aumente, sua largura também deve aumentar.
+
+```{r}
+p7 <- ggplot(df2, aes(x = comprimento, y = largura))+
+  geom_point(color = "steelblue", size = 3)+
+  theme_minimal()+
+  ggtitle("Correlação - Comprimento x Largura");p7
+```
+
+O Gráfico de correlação nos mostra que esse padrão é verdadeiro. 
+
+Contudo, é possível identifcar um valor outlier na faixa de 0cm de comprimento. 
+
+Vamos aplicar a mesma técnica realizada anteriormente e filtrar esses valores a fim de, encontrarmos as inconsistências nos dados.
+
+
+```{r}
+p8 <- ggplot(df3, aes(x = comprimento, y = largura))+
+  geom_point(color = "steelblue", size = 3, alpha = 0.5)+
+  theme_minimal()+
+  ggtitle("Correlação - Comprimento x Largura", subtitle = "Desconsiderando os outliers");p8
+```
+
+**Conclusão:**
+
+Comprimento x largura possuem **forte correlação positiva**.
+
+
+Podemos avaliar ainda, quais variáveis são mais determinantes para a precificação dos diamantes.
+
+Faremos isso utilizando uma matriz de correlação com o corrplot.
+
+```{r}
+df4 <- df3 %>% 
+  drop_na()
+num_vars <- sapply(df4, is.numeric)
+cor <- cor(df4[num_vars])
+corrplot(cor,method = "number")
+```
+
+Aqui, podemos ver que, o **peso**, **comprimento** e **largura** são as variáveis mais determinantes para o preço de um diamante, enquanto as demais variáveis possuem pouca significância.
+
+Também podemos analisar o que determina a qualidade de um diamante quando este é Ideal, Premium, Good e etc.
+
+Isso também nos auxiliará a entender o motivo pelo qual diamantes do tipo "Fair" (pior qualidade) tem mediana de preços mais elevados que diamantes do tipo "Ideal" (melhor qualidade).
+
+Para isso, vamos padronizar nossos dados, e transformar a variavel "qualidade" em numérica e em seguida fazer o estudo de correlação novamente.
+
+#### **Definição das variáveis categóricas:**
+
+**Qualidade:**
+
+- 1: Fair
+- 2: Good:
+- 3: Very Good
+- 4: Premium
+- 5: Ideal
+
+```{r}
+df_ <- df4 %>% 
+  mutate(qualidade = ifelse(qualidade == "Fair", 1,
+                            ifelse(qualidade == "Good",2,
+                                   ifelse(qualidade == "Very Good",3,
+                                          ifelse(qualidade == "Premium",4,5)))))
+
+num_vars <- sapply(df_,is.numeric)
+cor <- cor(df_[num_vars])
+corrplot(cor,method = "number")
+```
+
+A variável qualidade, **não**  é peça determinante na composição do preço do diamante, mas sim seu comprimento, largura e  principlamente seu peso.
+
+Muito provalvelmente, diamantes de qualidade inferior costumam pesar mais, logo tem preço maior. 
+Vamos verificar esse hipótese estudando o peso dos diamantes novamente:
+
+```{r}
+p4 <- ggplot(df,aes(x = qualidade, y = peso, fill = qualidade))+
+  geom_boxplot(color = "grey")+
+  theme_minimal()+
+  labs(title="Boxplot por qualidade dos diamantes",subtitle = "Análise de kilogramas", x = "Qualidade",y="Kilogramas");p4
+```
+
+Revisitando esse plot acerca dos kilogramas dos diamantes por qualidade, podemos atestar aqui que, diamantes de qualidade inferior (Fair) possuem **mais kilogramas** em comparação com diamantes de qualidade superior (Ideal).
+
+Ou seja, diamantes "Fair" são mais caros pois possuem mais kilogramas, pois conforme vimos no plot de correlação, Peso é a variável que mais está correlacionada ao Preço.
+
+```{r}
+plot <- ggplot(df_, aes(x = peso, y = preco))+
+  geom_point(color = "steelblue", alpha = 0.3)+
+  theme_minimal()+
+  ggtitle("Correlação entre peso e preço do diamante");plot
+
+
+corrplot(cor,method = "number")
+
+```
+
+É possível ver também que há correlação negativa moderada entre qualidade e tabela (largura do topo do diamante em relação ao ponto mais largo), ou seja, quanto menor a largura do topo em relação ao ponto mais largo do diamante, sua qualidade tende a aumentar de forma moderada.
+
+```{r}
+p9 <- ggplot(df_,aes(x = qualidade,y=tabela))+
+  geom_point(size = 3, color = "steelblue")+
+  theme_minimal()+
+  ggtitle("Correlação - Qualidade x Tabela");p9
+```
+
+
+#### **Plotando principais correlações:**
+```{r}
+p10 <- ggplot(df_,aes(x=comprimento,y=preco))+
+  geom_point(color = "lightblue",alpha = 0.5)+
+  theme_minimal()+
+  ggtitle("Comprimento x Preco")
+
+p11 <- ggplot(df_,aes(x=largura,y=preco))+
+  geom_point(color = "green",alpha = 0.1)+
+  theme_minimal()+
+  ggtitle("Largura x Preco")
+
+p12 <-  ggplot(df_,aes(x=peso,y=preco))+
+  geom_point(color = "red",alpha = 0.1)+
+  theme_minimal()+
+  ggtitle("Peso x Preco")
+
+p13 <-  ggplot(df_,aes(x=tabela,y=preco))+
+  geom_point(color = "grey",alpha = 0.3)+
+  theme_minimal()+
+  ggtitle("Tabela x Preco")
+
+
+gridExtra::grid.arrange(p10,p11,p12,p13,nrow = 2)
+```
+
+Também é possível ver que, dentre as medidas do diamante, tabela (largura do topo do diamante em relação ao ponto mais largo) é a unica na qual não possui relação significativa com o preço aplicado ao diamante, embora possua correlação negativa moderada com a qualidade do diamante.
+
+
+#### **Conclusão da análise:**
+
+- Diamantes do tipo "Fair" são mais pesados quando falamos em kilogramas;
+- Diamantes do tipo "Ideal são mais leves quando falamos em kilogramas;
+- O pesos, assim como as dimensões (exceto tabela) são às variáveis mais determinantes no preço dos diamantes;
+- Diamantes do tipo "Fair" são mais caros pois possuem mais kilogramas;
+- A variável tabela é moderadamente significativa na composição da qualidade de um diamante.
+
+
+
