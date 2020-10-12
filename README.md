@@ -1,7 +1,7 @@
 # Análise estatística do Dataset Diamonds
 ![img](https://github.com/sandropenha/analise-estatistica-diamonds/blob/master/polished-diamond.png)
 
-**[VER NOTEBOOK](https://rpubs.com/sandropenha/656882)**
+**[VER NOTEBOOK](https://htmlpreview.github.io/?https://raw.githubusercontent.com/sandropenha/analise-estatistica-diamonds/master/files/scripts/analise_diamantes_notebook.html)**
 
 ### Sobre:
 Análise estatística do dataset “diamonds” disponibilizado pela biblioteca do ggplot2, uma das mais importantes bibliotecas para visualização de dados quando falamos em data science.
